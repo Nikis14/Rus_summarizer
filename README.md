@@ -12,4 +12,6 @@ There were several models of text feature extraction under study:
 4) RuSBERT (pretrained model from DeepPavlov lib).
 5) MlSBERT (self-trained model using Sentence BERT for English).
 
+The research showed that the best algorithm for summarization is <b>"Mixed"</b> (based on the union of TextRank algorithm and MlSBERT_KMeans).
+
 All algorithms are in the folder "Summarizers".
