@@ -1,0 +1,36 @@
+Статистика по всем типам текстов:
+
+ROUGE-1:	F - 0.2053	Precision - 0.3035	Recall - 0.1703
+ROUGE-2:	F - 0.0749	Precision - 0.1111	Recall - 0.0613
+ROUGE-L:	F - 0.1630	Precision - 0.2128	Recall - 0.1439
+
+KEY_WORDS: 0.5938
+======================================
+
+Статистика по типу Tech:
+
+ROUGE-1:	F - 0.2125	Precision - 0.3447	Recall - 0.1668
+ROUGE-2:	F - 0.0813	Precision - 0.1327	Recall - 0.0615
+ROUGE-L:	F - 0.1758	Precision - 0.2439	Recall - 0.1499
+
+KEY_WORDS: 0.5660
+======================================
+
+Статистика по типу Humanity:
+
+ROUGE-1:	F - 0.2107	Precision - 0.2817	Recall - 0.1828
+ROUGE-2:	F - 0.0727	Precision - 0.1003	Recall - 0.0623
+ROUGE-L:	F - 0.1607	Precision - 0.1947	Recall - 0.1475
+
+KEY_WORDS: 0.6299
+======================================
+
+Статистика по типу Science:
+
+ROUGE-1:	F - 0.1926	Precision - 0.2839	Recall - 0.1614
+ROUGE-2:	F - 0.0709	Precision - 0.1003	Recall - 0.0602
+ROUGE-L:	F - 0.1526	Precision - 0.1999	Recall - 0.1345
+
+KEY_WORDS: 0.5854
+======================================
+
