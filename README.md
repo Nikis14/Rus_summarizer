@@ -1,2 +1,15 @@
-# Rus_summarizer
-Text summarization tools for Russian language
+# Rus_summarizer. Text summarization tools for Russian language
+### This repository contains algorithms for extracrive summarization of texts in Russian language.
+
+The algorithms are based on 2 approaches:
+1) TextRank.
+2) Sentence clustering using K-Means.
+
+There were several models of text feature extraction under study:
+1) Bag of words + TF-IDF.
+2) FastText (pretrained model from DeepPavlov lib).
+3) RuBERT (pretrained model from DeepPavlov lib).
+4) RuSBERT (pretrained model from DeepPavlov lib).
+5) MlSBERT (self-trained model using Sentence BERT for English).
+
+All algorithms are in the folder "Summarizers".
