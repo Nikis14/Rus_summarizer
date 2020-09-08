@@ -404,7 +404,7 @@ class MlSBERTKMeansSummarizer(AbstractKMeansSummarizer):
     def __init__(self):
         super().__init__()
         download_MlSBERT("../models/multilingual_SBERT")
-        self.model = SentenceTransformer("../models/multilingual_SBERT")
+        self.model = SentenceTransformer("../../models/multilingual_SBERT")
 
     def tokenize(self, text, min_sent_len=pt.min_sent_len):
         return pt.tokenize(text, min_sent_len)
