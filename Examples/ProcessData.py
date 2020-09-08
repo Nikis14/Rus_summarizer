@@ -1,7 +1,7 @@
 """
-This code is for generating summaries by all summarizers
+This code is for generating summaries by all Rus_summarizer
 """
-from src.summarizers import TextRankSummarizer, PageRankSummarizer, KMeansSummarizer, MixedSummarizer
+from src.Rus_summarizer import TextRankSummarizer, PageRankSummarizer, KMeansSummarizer, MixedSummarizer
 from src.processing_texts import analyze_dfs
 
 path_to_read = '../data/main_data/'

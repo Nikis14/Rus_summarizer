@@ -1,4 +1,4 @@
-from src.summarizers.download_tools import download_MlSBERT
+from src.Rus_summarizer.download_tools import download_MlSBERT
 import pandas as pd
 from nltk.corpus import stopwords
 stop_words = stopwords.words('english') + stopwords.words('russian')
