@@ -16,4 +16,4 @@ There were several models of text feature extraction under study:
 
 The research showed that the best algorithm for summarization is <b>"Mixed"</b> (based on the union of TextRank algorithm and MlSBERT_KMeans).
 
-All algorithms are in the folder "Summarizers".
+All algorithms are in the folder "src/Rus_summarizers".
