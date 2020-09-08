@@ -5,7 +5,6 @@ import io
 import zipfile
 import requests
 import os
-import logging
 
 def download(ref, path):
     """download model by ref, save to path

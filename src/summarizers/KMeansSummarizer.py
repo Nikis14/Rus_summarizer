@@ -1,25 +1,27 @@
-import preprocessing_tools as pt
-from download_tools import download_MlSBERT, download_FastText
+from src import preprocessing_tools as pt
+from src.summarizers.download_tools import download_MlSBERT, download_FastText
 import numpy as np
+import pandas as pd
 import re
 from nltk import word_tokenize
-from nltk.cluster.util import cosine_distance
-from sklearn.metrics.pairwise import cosine_similarity
 from nltk.corpus import stopwords
 stop_words = stopwords.words('english') + stopwords.words('russian')
 from abc import ABC, abstractmethod
-import networkx as nx
 import torch
 from sentence_transformers import SentenceTransformer
 from transformers import AutoTokenizer, AutoModelWithLMHead
 import fasttext as ft
+from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import TfidfTransformer
 from yandex_translate import YandexTranslate
 
 
-#Abstract class for PageRankSummarizer
-class AbstractPageRankSummarizer(ABC):
+#Abstract class for KMeansSummarizer
+class AbstractKMeansSummarizer(ABC):
     """
-    Abstract class used to represent summarizers based on PageRank
+    Abstract class used to represent summarizers based on K-Means
 
     Attributes
     ----------
@@ -28,9 +30,13 @@ class AbstractPageRankSummarizer(ABC):
     -------
     tokenize(text, min_sent_len=pt.min_sent_len)
         tokenizes text into sentences
-    build_similarity_matrix(sentences, additional_args)
-        build matrix of sentences similarity
-    generate_summary(text, base_sent_cout=5, min_sent_len=pt.min_sent_len, additional_args=None)
+    encode_sentences(self, sentences, additional_args)
+        extracts features from sentences
+    cluster_sentences(sentence_embeddings, max_count=10)
+        clusterizes sentences
+    _get_result_summary(clusters, sentences, sentence_embeddings) - private
+        creates summary by sentences and clusters
+    generate_summary(text, base_sent_cout=8, min_sent_len=pt.min_sent_len, additional_args=None)
         generates summary of text
     """
     @abstractmethod
@@ -39,15 +45,67 @@ class AbstractPageRankSummarizer(ABC):
 
     @abstractmethod
     def tokenize(self, text, min_sent_len=pt.min_sent_len):
-        """tokenize text into sentences"""
+        """
+        tokenizes text into sentences
+
+        Parameters
+        ----------
+        text : str
+            word to lemmatize
+        min_sent_len: int
+            minimum length of sentence to remain
+        """
         pass
 
     @abstractmethod
-    def build_similarity_matrix(self, sentences, additional_args):
-        """build matrix of similarity between sentences"""
+    def encode_sentences(self, sentences, additional_args):
+        """
+        builds matrix of similarity between sentences
+
+        Parameters
+        ----------
+        sentences : list
+            list of sentences
+        additional_args: ?
+            additional arguments
+        """
         pass
 
-    def generate_summary(self, text, base_sent_count=5, min_sent_len=pt.min_sent_len, additional_args=None):
+    def cluster_sentences(self, sentence_embeddings, max_count=10):
+        """
+        clusterizes sentences
+
+        Parameters
+        ----------
+        sentence_embeddings : numpy array
+            list of sentences
+        max_count: int
+            max count of clustsers
+        """
+        max_score = -1
+        best_clustering = None
+        for count_sentences in range(4, max_count + 1):
+            clustering = KMeans(n_clusters=count_sentences, random_state=0).fit(sentence_embeddings)
+            cur_score = silhouette_score(sentence_embeddings, clustering.labels_)
+            if cur_score > max_score:
+                best_clustering = clustering
+                max_score = cur_score
+        return best_clustering
+
+    def _get_result_summary(self, clusters, sentences, sentence_embeddings):
+        """
+        creates summary by sentences and clusters
+        """
+        sent_dist = clusters.transform(sentence_embeddings).min(axis=1)
+        df = pd.DataFrame({'sentences': sentences, 'dist': sent_dist, 'label': clusters.labels_})
+        grouped_df = df.groupby('label')
+        sentence_ids = grouped_df.apply(lambda df: df.dist.idxmin())
+        sentence_ids = sorted(sentence_ids)
+        result_sentences = list(df.loc[sentence_ids]['sentences'])
+        return ' '.join(result_sentences)
+
+    @abstractmethod
+    def generate_summary(self, text, base_sent_cout=8, min_sent_len=pt.min_sent_len, additional_args=None):
         """
         generate summary of the text
 
@@ -62,37 +120,21 @@ class AbstractPageRankSummarizer(ABC):
         additional_args: ?
             additional arguments
         """
-
-        # Step 1 - Read text and split it
         sentences = self.tokenize(text, min_sent_len)
         if len(sentences) <= 4:
             return text
 
-        # Step 2 - Generate Similary Martix across sentences
-        sentence_similarity_martix = self.build_similarity_matrix(sentences, additional_args)
-
-        # Step 3 - Rank sentences in similarity martix
-        sentence_similarity_graph = nx.from_numpy_array(sentence_similarity_martix)
-        scores = nx.pagerank(sentence_similarity_graph, alpha=0.6)
-
-        # Step 4 - Sort the rank and pick top sentences
-        ranked_sentence = sorted(((scores[i], s, i) for i, s in enumerate(sentences)), reverse=True)
-
-        result_sentences = ranked_sentence[:base_sent_count]
-        result_sentences = sorted(result_sentences, key=lambda x: x[2])
-
-        summarize_text = []
-        for i in range(base_sent_count):
-
-            if result_sentences[i] != []:
-                summarize_text.append(result_sentences[i][1])
-
-        return " ".join(summarize_text)
+        sentence_embeddings = self.encode_sentences(sentences, additional_args)
+        max_count = min(base_sent_cout, len(sentences) -  1)
+        clusters_kmeans_adjusted = self.cluster_sentences(sentence_embeddings, max_count=max(max_count, len(sentences) // 30))
+        if clusters_kmeans_adjusted is None:
+            return text
+        return self._get_result_summary(clusters_kmeans_adjusted, sentences, sentence_embeddings)
 
 
-class SimplePageRankSummarizer(AbstractPageRankSummarizer):
+class TfIdfKMeansSummarizer(AbstractKMeansSummarizer):
     """
-    Class used to represent Simple_PageRank summarizer
+    Class used to represent TF-IDF_KMMeans summarizer
 
     Attributes
     ----------
@@ -103,51 +145,31 @@ class SimplePageRankSummarizer(AbstractPageRankSummarizer):
     -------
     tokenize(text, min_sent_len=pt.min_sent_len)
         tokenizes text into sentences
-    sentence_similarity(sent1, sent2, remove_stopwords=False)
-        calculates similarity between 2 sentences
-    build_similarity_matrix(sentences, additional_args)
-        builds matrix of sentences similarity
-    generate_summary(text, base_sent_cout=5, min_sent_len=pt.min_sent_len, remove_stopwords=False)
+    encode_sentences(self, sentences, additional_args=None)
+        extracts features from sentences
+    cluster_sentences(sentence_embeddings, max_count=10)
+        clusterizes sentences
+    _get_result_summary(clusters, sentences, sentence_embeddings) - private
+        creates summary by sentences and clusters
+    generate_summary(text, base_sent_cout=8, min_sent_len=pt.min_sent_len)
         generates summary of text
     """
     def __init__(self):
         super().__init__()
         self._clean_sentences = ''
 
-    def tokenize(self, text, min_len=pt.min_sent_len):
-        sentences, self._clean_sentences = pt.tokenize_with_lemmatization(text, min_len)
+    def tokenize(self, text, min_sent_len=pt.min_sent_len):
+        sentences, self._clean_sentences = pt.tokenize_with_lemmatization(text, min_sent_len)
         return sentences
 
-    def sentence_similarity(self, sent1, sent2, remove_stopwords=False):
-        all_words = list(set(sent1 + sent2))
+    def encode_sentences(self, sentences, additional_args=None):
+        count_vect = CountVectorizer()
+        counts = count_vect.fit_transform(self._clean_sentences)
+        tfidf_transformer = TfidfTransformer()
+        return tfidf_transformer.fit_transform(counts)
 
-        vector1 = [0] * len(all_words)
-        vector2 = [0] * len(all_words)
 
-        # build the vector for the first sentence
-        for w in sent1:
-            if not remove_stopwords or w not in stop_words:
-                vector1[all_words.index(w)] += 1
-
-        # build the vector for the second sentence
-        for w in sent2:
-            if not remove_stopwords or w not in stop_words:
-                vector2[all_words.index(w)] += 1
-
-        return 1 - cosine_distance(vector1, vector2)
-
-    def build_similarity_matrix(self, sentences, remove_stopwords):
-        sentences = self._clean_sentences
-        similarity_matrix = np.zeros((len(sentences), len(sentences)))
-
-        for idx1 in range(len(sentences)):
-            for idx2 in range(len(sentences)):
-                if idx1 == idx2:  # ignore if both are same sentences
-                    continue
-                similarity_matrix[idx1][idx2] = self.sentence_similarity(sentences[idx1], sentences[idx2], remove_stopwords)
-        return np.array(similarity_matrix)
-
-    def generate_summary(self, text, base_sent_count=5, min_sent_len=pt.min_sent_len, remove_stopwords=False):
+    def generate_summary(self, text, base_sent_cout=8, min_sent_len=pt.min_sent_len):
         """
         generate summary of the text
 
@@ -159,19 +181,17 @@ class SimplePageRankSummarizer(AbstractPageRankSummarizer):
             count of sentences in summary
         min_sent_len: int
             minimum length of sentence to remain
-        remove_stopwords: bool
-            remove stopwords or not
         """
-        return super().generate_summary(text, base_sent_count, min_sent_len, remove_stopwords)
+        return super().generate_summary(text, base_sent_cout, min_sent_len, None)
 
 
-class RuSBERTPageRankSummarizer(AbstractPageRankSummarizer):
+class RuSBERTKMeansSummarizer(AbstractKMeansSummarizer):
     """
-    Class used to represent RuSBERT_PageRank summarizer
+    Class used to represent RuSBERT_KMMeans summarizer
 
     Attributes
     ----------
-     tokenizer: AutoTokenizer
+    tokenizer: AutoTokenizer
         tokenizer for RuSBERT model
     model: AutoModelWithLMHead
         RuSBERT model
@@ -182,9 +202,11 @@ class RuSBERTPageRankSummarizer(AbstractPageRankSummarizer):
         tokenizes text into sentences
     encode_sentences(self, sentences, add_special_tokens)
         extracts features from sentences
-    build_similarity_matrix(sentences, additional_args)
-        build matrix of sentences similarity
-    generate_summary(text, base_sent_cout=5, min_sent_len=pt.min_sent_len, additional_args=None)
+    cluster_sentences(sentence_embeddings, max_count=10)
+        clusterizes sentences
+    _get_result_summary(clusters, sentences, sentence_embeddings) - private
+        creates summary by sentences and clusters
+    generate_summary(text, base_sent_cout=8, min_sent_len=pt.min_sent_len, add_special_tokens=False)
         generates summary of text
     """
     def __init__(self):
@@ -211,12 +233,7 @@ class RuSBERTPageRankSummarizer(AbstractPageRankSummarizer):
             res_embeddings.append(sentence_embeddings)
         return torch.stack(res_embeddings, dim=0).detach().numpy()
 
-    def build_similarity_matrix(self, sentences, add_special_tokens):
-        sentence_embeddings = self.encode_sentences(sentences, add_special_tokens)
-        pre_res = cosine_similarity(sentence_embeddings)
-        return np.abs(np.ones(pre_res.shape) - pre_res)
-
-    def generate_summary(self, text, base_sent_count=5, min_sent_len=pt.min_sent_len, add_special_tokens=True):
+    def generate_summary(self, text, base_sent_cout=8, min_sent_len=pt.min_sent_len, add_special_tokens=False):
         """
         generate summary of the text
 
@@ -231,12 +248,12 @@ class RuSBERTPageRankSummarizer(AbstractPageRankSummarizer):
         add_special_tokens: bool
             whether add tokens [CLS], [SEP] before use of RuSBERT
         """
-        return super().generate_summary(text, base_sent_count, min_sent_len, add_special_tokens)
+        return super().generate_summary(text, base_sent_cout, min_sent_len, add_special_tokens)
 
 
-class RuBERTPageRankSummarizer(AbstractPageRankSummarizer):
+class RuBERTKMeansSummarizer(AbstractKMeansSummarizer):
     """
-    Class used to represent RuBERT_PageRank summarizer
+    Class used to represent RuBERT_KMMeans summarizer
 
     Attributes
     ----------
@@ -249,11 +266,13 @@ class RuBERTPageRankSummarizer(AbstractPageRankSummarizer):
     -------
     tokenize(text, min_sent_len=pt.min_sent_len)
         tokenizes text into sentences
-    encode_sentences(self, sentences, add_special_tokens)
+    encode_sentences(self, sentences, additional_args)
         extracts features from sentences
-    build_similarity_matrix(sentences, additional_args)
-        build matrix of sentences similarity
-    generate_summary(text, base_sent_cout=5, min_sent_len=pt.min_sent_len, additional_args=None)
+    cluster_sentences(sentence_embeddings, max_count=10)
+        clusterizes sentences
+    _get_result_summary(clusters, sentences, sentence_embeddings) - private
+        creates summary by sentences and clusters
+    generate_summary(text, base_sent_cout=8, min_sent_len=pt.min_sent_len, add_special_tokens=False)
         generates summary of text
     """
     def __init__(self):
@@ -272,20 +291,14 @@ class RuBERTPageRankSummarizer(AbstractPageRankSummarizer):
             try:
                 embeddings = self.model(input_ids=input_ids)[0]
             except IndexError:
-                input_ids = torch.tensor(
-                    self.tokenizer.encode('0', add_special_tokens=add_special_tokens)).unsqueeze(0)
+                input_ids = torch.tensor(self.tokenizer.encode('0', add_special_tokens=add_special_tokens)).unsqueeze(0)
                 embeddings = self.model(input_ids=input_ids)[0]
             embeddings = embeddings.squeeze(0)
             sentence_embeddings = torch.mean(embeddings, dim=0)
             res_embeddings.append(sentence_embeddings)
         return torch.stack(res_embeddings, dim=0).detach().numpy()
 
-    def build_similarity_matrix(self, sentences, add_special_tokens):
-        sentence_embeddings = self.encode_sentences(sentences, add_special_tokens)
-        pre_res = cosine_similarity(sentence_embeddings)
-        return np.abs(np.ones(pre_res.shape) - pre_res)
-
-    def generate_summary(self, text, base_sent_count=5, min_sent_len=pt.min_sent_len, add_special_tokens=True):
+    def generate_summary(self, text, base_sent_cout=8, min_sent_len=pt.min_sent_len, add_special_tokens=False):
         """
         generate summary of the text
 
@@ -300,12 +313,12 @@ class RuBERTPageRankSummarizer(AbstractPageRankSummarizer):
         add_special_tokens: bool
             whether add tokens [CLS], [SEP] before use of RuBERT
         """
-        return super().generate_summary(text, base_sent_count, min_sent_len, add_special_tokens)
+        return super().generate_summary(text, base_sent_cout, min_sent_len, add_special_tokens)
 
 
-class FastTextPageRankSummarizer(AbstractPageRankSummarizer):
+class FastTextKMeansSummarizer(AbstractKMeansSummarizer):
     """
-    Class used to represent FastText_PageRank summarizer
+    Class used to represent FastText_KMMeans summarizer
 
     Attributes
     ----------
@@ -316,11 +329,13 @@ class FastTextPageRankSummarizer(AbstractPageRankSummarizer):
     -------
     tokenize(text, min_sent_len=pt.min_sent_len)
         tokenizes text into sentences
-    encode_sentences(self, sentences, add_special_tokens)
+    encode_sentences(self, sentences, additional_args)
         extracts features from sentences
-    build_similarity_matrix(sentences, additional_args)
-        build matrix of sentences similarity
-    generate_summary(text, base_sent_cout=5, min_sent_len=pt.min_sent_len, additional_args=None)
+    cluster_sentences(sentence_embeddings, max_count=10)
+        clusterizes sentences
+    _get_result_summary(clusters, sentences, sentence_embeddings) - private
+        creates summary by sentences and clusters
+    generate_summary(text, base_sent_cout=8, min_sent_len=pt.min_sent_len, clean=True)
         generates summary of text
     """
     def __init__(self):
@@ -346,12 +361,7 @@ class FastTextPageRankSummarizer(AbstractPageRankSummarizer):
 
         return np.stack(res_embeddings, axis=0)
 
-    def build_similarity_matrix(self, sentences, clean):
-        sentence_embeddings = self.encode_sentences(sentences, clean)
-        pre_res = cosine_similarity(sentence_embeddings)
-        return np.abs(np.ones(pre_res.shape) - pre_res)
-
-    def generate_summary(self, text, base_sent_count=5, min_sent_len=pt.min_sent_len, clean=True):
+    def generate_summary(self, text, base_sent_cout=8, min_sent_len=pt.min_sent_len, clean=True):
         """
         generate summary of the text
 
@@ -366,12 +376,12 @@ class FastTextPageRankSummarizer(AbstractPageRankSummarizer):
         clean: bool
             drop punctuation or not
         """
-        return super().generate_summary(text, base_sent_count, min_sent_len, clean)
+        return super().generate_summary(text, base_sent_cout, min_sent_len, clean)
 
 
-class MlSBERTPageRankSummarizer(AbstractPageRankSummarizer):
+class MlSBERTKMeansSummarizer(AbstractKMeansSummarizer):
     """
-    Class used to represent MlSBERT_PageRank summarizer
+    Class used to represent MlSBERT_KMMeans summarizer
 
     Attributes
     ----------
@@ -382,9 +392,13 @@ class MlSBERTPageRankSummarizer(AbstractPageRankSummarizer):
     -------
     tokenize(text, min_sent_len=pt.min_sent_len)
         tokenizes text into sentences
-    build_similarity_matrix(sentences, additional_args)
-        build matrix of sentences similarity
-    generate_summary(text, base_sent_cout=5, min_sent_len=pt.min_sent_len)
+    encode_sentences(self, sentences, additional_args)
+        extracts features from sentences
+    cluster_sentences(sentence_embeddings, max_count=10)
+        clusterizes sentences
+    _get_result_summary(clusters, sentences, sentence_embeddings) - private
+        creates summary by sentences and clusters
+    generate_summary(text, base_sent_cout=8, min_sent_len=pt.min_sent_len)
         generates summary of text
     """
     def __init__(self):
@@ -395,70 +409,8 @@ class MlSBERTPageRankSummarizer(AbstractPageRankSummarizer):
     def tokenize(self, text, min_sent_len=pt.min_sent_len):
         return pt.tokenize(text, min_sent_len)
 
-    def build_similarity_matrix(self, sentences, additional_args):
-        sentence_embeddings = self.model.encode(sentences)
-        pre_res = cosine_similarity(sentence_embeddings)
-        return np.abs(np.ones(pre_res.shape) - pre_res)
-
-    def generate_summary(self, text, base_sent_count=5, min_sent_len=pt.min_sent_len):
-        """
-        generate summary of the text
-
-        Parameters
-        ----------
-        text : str
-            input text
-        base_sent_cout: int
-            count of sentences in summary
-        min_sent_len: int
-            minimum length of sentence to remain
-        """
-        return super().generate_summary(text, base_sent_count, min_sent_len, None)
-
-
-class EnSBERTPageRankSummarizer(AbstractPageRankSummarizer):
-    """
-    Class used to represent EnSBERT_PageRank summarizer
-
-    Attributes
-    ----------
-    model: SBERT
-        EnSBERT model
-
-    Methods
-    -------
-    tokenize(text, min_sent_len=pt.min_sent_len)
-        tokenizes text into sentences
-    translate_to_english(sentences)
-        translate sentences from russian to english
-    build_similarity_matrix(sentences, additional_args)
-        build matrix of sentences similarity
-    generate_summary(text, base_sent_cout=5, min_sent_len=pt.min_sent_len)
-        generates summary of text
-    """
-    def __init__(self, yandex_translate_api_key):
-        super().__init__()
-        self.model = model = SentenceTransformer('roberta-large-nli-stsb-mean-tokens')
-        self.translate = YandexTranslate(yandex_translate_api_key)
-
-    def tokenize(self, text, min_sent_len=pt.min_sent_len):
-        return pt.tokenize(text, min_sent_len)
-
-    def translate_to_english(self, sentences):
-        res = []
-        for sentence in sentences:
-            sentence = self.translate.translate(sentence, 'ru-en')['text'][0]
-            sentence = re.sub('\.+', '.', sentence)
-            sentence = re.sub('[\.\?\!]\;"', ';', sentence)
-            sentence = sentence.replace('.;', ';')
-            res.append(sentence)
-        return res
-
-    def build_similarity_matrix(self, sentences, additional_args):
-        sentences_english = self.translate_to_english(sentences)
-        sentence_embeddings = self.model.encode(sentences_english)
-        pre_res = cosine_similarity(sentence_embeddings)
-        return np.abs(np.ones(pre_res.shape) - pre_res)
+    def encode_sentences(self, sentences, additional_args=None):
+        return self.model.encode(sentences)
 
     def generate_summary(self, text, base_sent_cout=8, min_sent_len=pt.min_sent_len):
         """
@@ -474,3 +426,74 @@ class EnSBERTPageRankSummarizer(AbstractPageRankSummarizer):
             minimum length of sentence to remain
         """
         return super().generate_summary(text, base_sent_cout, min_sent_len, None)
+
+
+class EnSBERTKMeansSummarizer(AbstractKMeansSummarizer):
+    """
+    Class used to represent EnSBERT_KMMeans summarizer
+
+    Attributes
+    ----------
+    model: SBERT
+        EnSBERT model
+
+    Methods
+    -------
+    tokenize(text, min_sent_len=pt.min_sent_len)
+        tokenizes text into sentences
+    translate_to_english(sentences)
+        translate sentences from russian to english
+    encode_sentences(self, sentences, additional_args)
+        extracts features from sentences
+    cluster_sentences(sentence_embeddings, max_count=10)
+        clusterizes sentences
+    _get_result_summary(clusters, sentences, sentence_embeddings) - private
+        creates summary by sentences and clusters
+    generate_summary(text, base_sent_cout=8, min_sent_len=pt.min_sent_len)
+        generates summary of text
+    """
+    def __init__(self, yandex_translate_api_key):
+        super().__init__()
+        self.model = model = SentenceTransformer('roberta-large-nli-stsb-mean-tokens')
+        self.translate = YandexTranslate(yandex_translate_api_key)
+
+    def tokenize(self, text, min_sent_len=pt.min_sent_len):
+        return pt.tokenize(text, min_sent_len)
+
+    def translate_to_english(self, sentences):
+        """
+        translate sentences to english
+
+        Parameters
+        ----------
+        sentences : list
+            list of sentences
+        """
+        res = []
+        for sentence in sentences:
+            sentence = self.translate.translate(sentence, 'ru-en')['text'][0]
+            sentence = re.sub('\.+', '', sentence)
+            sentence = re.sub('[\.\?\!]\;"', ';', sentence)
+            sentence = sentence.replace('.;', ';')
+            res.append(sentence)
+        return res
+
+    def encode_sentences(self, sentences, additional_args=None):
+        sentences_english = self.translate_to_english(sentences)
+        return self.model.encode(sentences_english)
+
+    def generate_summary(self, text, base_sent_cout=8, min_sent_len=pt.min_sent_len):
+        """
+        generate summary of the text
+
+        Parameters
+        ----------
+        text : str
+            input text
+        base_sent_cout: int
+            count of sentences in summary
+        min_sent_len: int
+            minimum length of sentence to remain
+        """
+        return super().generate_summary(text, base_sent_cout, min_sent_len, None)
+

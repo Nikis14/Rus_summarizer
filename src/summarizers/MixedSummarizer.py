@@ -1,16 +1,12 @@
-import preprocessing_tools as pt
-from download_tools import download_MlSBERT
-import numpy as np
+from src.summarizers.download_tools import download_MlSBERT
 import pandas as pd
-import re
 from nltk.corpus import stopwords
 stop_words = stopwords.words('english') + stopwords.words('russian')
-import preprocessing_tools as pt
+import src.preprocessing_tools as pt
 from itertools import combinations
 from nltk import word_tokenize
 import networkx as nx
 import math
-import torch
 from sentence_transformers import SentenceTransformer
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score

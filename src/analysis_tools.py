@@ -1,12 +1,12 @@
 """
 This code is for getting statistics of evaluated summaries and saving to .docx files
 """
-from preprocessing_tools import create_dir
+from .preprocessing_tools import create_dir
 from docx import Document
 from docx.shared import Pt
 import os
 import pandas as pd
-from preprocessing_tools import preprocess_path
+from .preprocessing_tools import preprocess_path
 
 #dict for printing
 score_names = {

@@ -1,7 +1,7 @@
 """
 This code creates .docx files with generated summaries for comparing manually
 """
-from analysis_tools import read_data, create_dfs_info, process_topics
+from src.analysis_tools import read_data, create_dfs_info, process_topics
 
 path_to_save = '../data/Prepared_for_check/'
 path_to_read = '../data/analyzed_data/'

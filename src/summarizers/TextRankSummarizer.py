@@ -1,5 +1,5 @@
 # Алгоритм TextRank в исходном виде
-import preprocessing_tools as pt
+from src import preprocessing_tools as pt
 from itertools import combinations
 from nltk import word_tokenize
 import networkx as nx

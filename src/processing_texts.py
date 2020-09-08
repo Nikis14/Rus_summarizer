@@ -3,7 +3,7 @@ Generate summary for all texts in dataframe by path
 """
 import os
 import pandas as pd
-from preprocessing_tools import preprocess_path, min_sent_len, create_dir
+from src.preprocessing_tools import preprocess_path, min_sent_len, create_dir
 
 #generate summary for all texts in dataframe by path
 def analyze_dfs(

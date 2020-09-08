@@ -6,6 +6,6 @@ This code is for evaluation of dataframe in which every text contains:
 Evakuation: ROUGE-1, ROUGE-2, ROUGE_L, key words%
 """
 
-import Evaluate as eval
+from src import Evaluate as eval
 
 eval.estimate_dfs('../data/analyzed_data/')

@@ -2,7 +2,7 @@
 This code is for comparing time between models
 """
 import pandas as pd
-from summarizers import KMeansSummarizer, PageRankSummarizer, TextRankSummarizer, MixedSummarizer
+from src.summarizers import TextRankSummarizer, PageRankSummarizer, KMeansSummarizer, MixedSummarizer
 import time
 
 #necessary for working with EnSBERT

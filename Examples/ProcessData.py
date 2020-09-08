@@ -1,8 +1,8 @@
 """
 This code is for generating summaries by all summarizers
 """
-from summarizers import KMeansSummarizer, PageRankSummarizer, TextRankSummarizer, MixedSummarizer
-from processing_texts import analyze_dfs
+from src.summarizers import TextRankSummarizer, PageRankSummarizer, KMeansSummarizer, MixedSummarizer
+from src.processing_texts import analyze_dfs
 
 path_to_read = '../data/main_data/'
 path_to_save = '../data/analyzed_data/'

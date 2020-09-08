@@ -5,7 +5,7 @@ This code contains functions for evaluation of dataframe in which every text con
 3) Key words (column "key_words")
 Evaluation metrics: ROUGE-1, ROUGE-2, ROUGE_L, key words%
 """
-from preprocessing_tools import lemmatize_text, preprocess_path
+from src.preprocessing_tools import lemmatize_text, preprocess_path
 import pymorphy2
 import os
 import pandas as pd

@@ -1,12 +1,12 @@
 """
 Functions for text preprocessing
 """
-from rusenttokenize import ru_sent_tokenize
-import logging
-logging.disable(logging.CRITICAL)
 import re
 import os
 import pymorphy2
+from rusenttokenize import ru_sent_tokenize
+import logging
+logging.disable(logging.CRITICAL)
 from nltk import word_tokenize
 from nltk.corpus import stopwords
 stop_words = set(stopwords.words('english') + stopwords.words('russian'))
@@ -31,8 +31,8 @@ def lemmatize_word(word, remove_stopwords=False):
         return ''
     if len(re.findall('[a-z0-9]', word)):
         return word
-    parsed = morph.parse(word)[0] #все разборы слова. Выбираем первый разбор
-    lemma = parsed.normal_form #лемма
+    parsed = morph.parse(word)[0]
+    lemma = parsed.normal_form
     if remove_stopwords and word in stop_words:
         return ''
     return lemma
@@ -63,7 +63,7 @@ def preprocess_text(text):
         text to preprocess
     """
     text = text.replace('\n', ' ').replace('\r', '')
-    text = re.sub('\.+', '.', text)
+    text = re.sub('\.+', '..', text)
     text = text.replace('«', '"').replace('»', '"')
     text = re.sub('[\.\?\!\;]"', '"', text)
     text = re.sub('[\.\?\!]\;"', ';', text)
