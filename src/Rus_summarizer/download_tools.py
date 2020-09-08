@@ -21,7 +21,7 @@ def download(ref, path):
         print('Download multilingual_SBERT... Please wait')
         r = requests.get(ref)
         with r, zipfile.ZipFile(io.BytesIO(r.content)) as archive:
-            archive.extractall('models')
+            archive.extractall(path)
         #logging.info('Complete!')
         print('Download complete!')
 
