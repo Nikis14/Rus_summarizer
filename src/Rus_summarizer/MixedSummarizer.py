@@ -47,7 +47,7 @@ class MixedSummarizer():
 
     def __init__(self):
         super().__init__()
-        download_MlSBERT("../models/multilingual_SBERT")
+        download_MlSBERT("../models")
         self.model = SentenceTransformer("../models/multilingual_SBERT")
 
     def tokenize(self, text, min_sent_len=pt.min_sent_len):
