@@ -1,7 +1,7 @@
 # Rus_summarizer. Text summarization tools for Russian language
 ### This repository contains algorithms for extracrive summarization of texts in Russian language.
 
-The paper and its presentation are availble in description folder ([here](https://github.com/Nikis14/Rus_summarizer/blob/master/description/Diploma_Paper.pdf) and [here](https://github.com/Nikis14/Rus_summarizer/blob/master/description/Presentation.pdf)).
+The thesis and presentation are availble in description folder ([here](https://github.com/Nikis14/Rus_summarizer/blob/master/description/Diploma_Paper.pdf) and [here](https://github.com/Nikis14/Rus_summarizer/blob/master/description/Presentation.pdf)).
 
 The algorithms are based on 2 approaches:
 1) TextRank.
