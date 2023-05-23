@@ -9,7 +9,7 @@ rusenttokenize==0.0.5
 yandex.translate==0.3.5
 rouge==1.0.0
 nltk==3.5
-requests==2.24.0
+requests==2.31.0
 numpy==1.19.1
 python_docx==0.8.10
 docx==0.2.4
